@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
-#include "shared.h"
 
 #define MAX_ENTRIES 32
 #define NOT_FOUND MAX_ENTRIES+1
@@ -38,7 +37,7 @@ void age_entries() {
  */
 char * get_entry(char * service) {
 	for (size_t i = 0; i < MAX_ENTRIES; i++) {
-		if (addr_cache[i].occupied && strcmp(name, addr_cache[i].service) == 0) {
+		if (addr_cache[i].occupied && strcmp(service, addr_cache[i].service) == 0) {
 			return addr_cache[i].addr_info;
 		}
 	}
@@ -86,10 +85,10 @@ void put_entry(char * service, char * addr_info) {
 		pos = page_entry();
 	}
 
-	strcpy(addr_info[pos].service, service);
-	strcpy(addr_info[pos].addr_info, addr_info);
-	addr_info[pos].age = 0;
-	addr_info[pos].occupied = 1;
+	strcpy(addr_cache[pos].service, service);
+	strcpy(addr_cache[pos].addr_info, addr_info);
+	addr_cache[pos].age = 0;
+	addr_cache[pos].occupied = 1;
 }
 
 /**
@@ -97,4 +96,5 @@ void put_entry(char * service, char * addr_info) {
  */
 int main(int argc, char * argv[]) {
 
+	return 0;
 }
