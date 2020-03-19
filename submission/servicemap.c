@@ -78,6 +78,14 @@ size_t page_entry() {
 	return pos;
 }
 
+void print_cache() {
+	for (size_t i = 0; i < MAX_ENTRIES; i++) {
+		if (addr_cache[i].occupied) {
+			printf("Entry %zd: %s => %s\n", i, addr_cache[i].service, addr_cache[i].addr_info);
+		}
+	}
+}
+
 /**
  * Stores an entry in the service cache.
  * @param service The name of the service.
@@ -103,11 +111,26 @@ void put_entry(char * service, char * addr_info) {
 	addr_cache[pos].occupied = 1;
 }
 
+int test_addr_cache() {
+	init_cache();
+
+	put_entry("database", "192,168,1,2,233,37");
+	put_entry("mapper", "192,168,1,1,15,7");
+	put_entry("webserver", "192,168,1,3,32,55");
+
+	char * addr_info = get_entry("database");
+
+	if (strcmp(addr_info, "192,168,1,2,233,37") != 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
 /**
  * Starts the service mapper 
  */
 int main(int argc, char * argv[]) {
-	init_cache();
 
 	return 0;
 }
