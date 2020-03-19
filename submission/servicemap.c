@@ -46,6 +46,18 @@ char * get_entry(char * service) {
 }
 
 /**
+ * Initializes the service cache.
+ */
+void init_cache() {
+	for (size_t i = 0; i < MAX_ENTRIES; i++) {
+		memset(addr_cache[i].service, 0, sizeof(addr_cache[i].service));
+		memset(addr_cache[i].addr_info, 0, sizeof(addr_cache[i].addr_info));
+		addr_cache[i].age = 0;
+		addr_cache[i].occupied = 0;
+	}
+}
+
+/**
  * Pages an entry from the service cache. Called when the cache is full and a 
  * put request is made.
  * @returns A position in the cache to store the new entry.
@@ -95,6 +107,7 @@ void put_entry(char * service, char * addr_info) {
  * Starts the service mapper 
  */
 int main(int argc, char * argv[]) {
+	init_cache();
 
 	return 0;
 }
