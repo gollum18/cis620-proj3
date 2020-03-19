@@ -5,10 +5,11 @@ CLASS=cis620s
 PROJECT=proj3
 
 DEPENDS=db20
-$HFILES=shared.h
 SRCFILES=client.c server.c servicemap.c
 OBJFILES=client.o server.o servicemap.o
 EXEFILES=client server servicemap
+
+.PHONY: all clean submit depend
 
 all: $(EXEFILES)
 
@@ -24,8 +25,8 @@ servicemap: servicemap.o
 clean:
 	rm $(OBJFILES) $(EXEFILES)
 
-depend: 
-	makedepend $(IFLAGS) $(SRCFILES)
-
 submit:
-	turnin -c $(CLASS) -p $(PROJECT) $(SRCFILES) $(DEPENDS)
+	turnin -c $(CLASS) -p $(PROJECT) $(SRCFILES) $(DEPENDS) makefile
+
+depend:
+	makedepend $(IFLAGS) $(SRCFILES)
