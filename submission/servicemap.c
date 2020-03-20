@@ -1,4 +1,17 @@
+/**
+ * Implements a net app that maps Internet services to an IP
+ * address and port for a LAN.
+ * Changelog:
+ *	03/13/2020 - Created initial version.
+ *	03/15/2020 - Refactored some of the cache methods.
+ *	03/20/2020 - Started net code.
+ *	03/20/2020 - Change size_t to socklen_t.
+ */
+
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -109,8 +122,8 @@ void put_entry(char * service, char * addr_info) {
 		pos = page_entry();
 	}
 
-	strcpy(addr_cache[pos].service, service);
-	strcpy(addr_cache[pos].addr_info, addr_info);
+	strncpy(addr_cache[pos].service, service, sizeof(addr_cache[pos].service));
+	strncpy(addr_cache[pos].addr_info, addr_info, sizeof(addr_cache[pos].addr_info));
 	addr_cache[pos].age = 0;
 	addr_cache[pos].occupied = 1;
 }
@@ -132,9 +145,57 @@ int test_addr_cache() {
 }
 
 /**
- * Starts the service mapper 
+ * Starts the service mapper.
  */
 int main(int argc, char * argv[]) {
+	struct sockaddr_in local, remote;
+	socklen_t len=sizeof(local), rlen=sizeof(remote);
+	int sk=0;
+	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
+	if ((sk = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		perror("socket error");
+		exit(1);
+	}
+
+	local.sin_family = AF_INET;
+	local.sin_port = htons(MAPPER_PORT);
+	local.sin_addr.s_addr = INADDR_ANY;
+
+	if (bind(sk, (struct sockaddr *)&local, len) < 0) {
+		perror("bind error");
+		close(sk);
+		exit(1);
+	}
+
+	while (1) {
+		memset(recvbuf, 0, BUFMAX);
+
+		// receive over the UDP socket, dest host is remote
+		recvfrom(sk, recvbuf, BUFMAX, 0, (struct sockaddr *)&remote, (socklen_t *)&rlen);
+
+		char * tokens[3]; // max token amt is 3
+		parse_string(recvbuf, tokens, 3, " ");
+
+		if (strcmp(tokens[0], "PUT") == 0) { // PUT command
+			// locally store the address
+			put_entry(tokens[1], tokens[2]);
+		} else if (strcmp(tokens[0], "GET") == 0) { // GET command
+			// retrieve the entry
+			char * addr_info = get_entry(tokens[1]);
+			if (addr_info == NULL) { // error
+
+			} else {
+				strncpy(sendbuf, addr_info, sizeof(sendbuf));
+			}
+		} else { // error
+
+		}
+
+		// send the message to the dest host
+		sendto(sk, sendbuf, sizeof(sendbuf), 0, (struct sockaddr *)&remote, rlen);
+	}
+
+	close(sk);
 	return 0;
 }

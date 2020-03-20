@@ -6,6 +6,7 @@
  *	03/15/2020 - Started net code.
  *	03/18/2020 - Continued net code.
  *	03/20/2020 - Add in signal handler for child process.
+ *	03/20/2020 - Change size_t to socklen_t.
  */
 
 #include <sys/types.h>
@@ -164,7 +165,7 @@ int main(int argc, char * argv[]) {
 	struct query_t query_msg;
 	struct update_t update_msg;
 	struct sockaddr_in local, remote;
-	size_t len=sizeof(local), rlen=sizeof(remote);
+	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	int local_tcp_sk, remote_tcp_sk, udp_sk;
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 

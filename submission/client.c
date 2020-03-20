@@ -1,3 +1,12 @@
+/**
+ * Implements a client that interacts with the database service.
+ * Changelog:
+ *	03/13/2020 - Created initial version.
+ *	03/15/2020 - Started net code.
+ *	03/18/2020 - Continued net code.
+ *	03/20/2020 - Change size_t to socklen_t.
+ */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
@@ -68,7 +77,7 @@ int main(int argc, char * argv[])
 	// networking variables
 	struct sockaddr_in local, remote;
 	int local_sk=0, remote_sk=0;
-	size_t len=sizeof(local), rlen=sizeof(remote);
+	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	// Broadcast a request to the mapper for the addr string
@@ -101,7 +110,7 @@ int main(int argc, char * argv[])
 		printf("client: ");
 		fgets(cmdbuf, BUFMAX, stdin);
 		cmdbuf[strlen(cmdbuf)-1] = '\0'; // get rid of \n
-		parse_input(cmdbuf, tokens, 3, " ");
+		parse_string(cmdbuf, tokens, 3, " ");
 
 		if (strcmp(tokens[0], "query") == 0) {
 			// TODO: Build a query request and send to database
