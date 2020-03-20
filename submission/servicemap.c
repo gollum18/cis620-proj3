@@ -4,12 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
-
-#define CLIENT_PORT 7777
-#define SERVER_PORT 7777
-#define MAPPER_PORT 21896
-
-#define BUFMAX 1024
+#include "util.h"
 
 #define MAX_ENTRIES 32
 #define NOT_FOUND MAX_ENTRIES+1

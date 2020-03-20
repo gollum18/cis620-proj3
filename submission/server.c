@@ -4,27 +4,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
-
-#define CLIENT_PORT 7777
-#define SERVER_PORT 7777
-#define MAPPER_PORT 21896
-
-#define BUFMAX 1024
-
-#define DBFILE "db20"
-
-// client->database query message
-struct query_t {
-	int code;
-	int acctnum;
-};
-
-// client->database update message
-struct update_t {
-	int code;
-	int acctnum;
-	float value;
-};
+#include "util.h"
 
 struct record_t {
 	int acctnum;
