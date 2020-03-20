@@ -36,28 +36,18 @@ struct update_t {
 
 /**
  * Parses a string into individual words/components.
- * @param src The string to be split.
- * @param dest The destination array to write tokens back to.
- * @param n The size of dest.
- * @param delim The delimiter to split src on.
  */
 void parse_string(char *, char * [], size_t, char *);
 
 /**
  * Converts an address and port to an address string.
- * @param addr The socket address to translate.
- * @param dest The destination buffer.
- * @param n The size of the destination buffer.
  */
-void to_addr_string(struct sockaddr_in, char *, size_t); 
+void to_addr_string(char *, unsigned short, char *, size_t);
 
 /**
  * Translates an address string back to an inet address and port. 
  * The address will be in network-byte order while the port will 
  * be in host-byte order.
- * @param src The buffer containing the address string.
- * @param n The size of the source buffer.
- * @param dest The destination socket address.
  */
 void from_addr_string(char *, size_t, struct sockaddr_in *); 
 

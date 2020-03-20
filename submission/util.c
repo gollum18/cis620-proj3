@@ -32,23 +32,24 @@ void parse_string(char * src,
 
 /**
  * Converts an address and port to an address string.
- * @param addr The socket address to translate.
+ * @param addr Buffer containing the ASCII IP address to translate.
+ * @param port The port number in network-byte order.
  * @param dest The destination buffer.
  * @param n The size of the destination buffer.
  */
-void to_addr_string(struct sockaddr_in addr,
+void to_addr_string(char * addr,
+					unsigned short port,
                     char * dest,
                     size_t n)
 {
     memset(dest, 0, n);
 
-    // the port should already be in network-byte order
-    unsigned short quotient = Q(addr.sin_port);
-    unsigned short remainder = R(addr.sin_port);
+	// port should already be in network-byte order
+    unsigned short quotient = Q(port);
+    unsigned short remainder = R(port);
 
-    char * addr_str = inet_ntoa(*(struct in_addr *)&addr);
     char * tokens[4];
-    parse_string(addr_str, tokens, 4, ".");
+    parse_string(addr, tokens, 4, ".");
 
     snprintf(dest, n, "%s,%s,%s,%s,%d,%d%c", tokens[0], tokens[1], tokens[2], tokens[3], quotient, remainder, '\0');
 }

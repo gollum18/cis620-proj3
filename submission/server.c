@@ -6,13 +6,15 @@
  *	03/15/2020 - Started net code.
  *	03/18/2020 - Continued net code.
  *	03/20/2020 - Add in signal handler for child process.
- *	03/20/2020 - Change size_t to socklen_t.
+ *			   - Change size_t to socklen_t.
+ *			   - Implement service broadcasting.
  */
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -145,10 +147,72 @@ void print_db() {
 
 /**
  * Broadcasts the service to the service mapper.
+ * @param service The name of the service to advertise.
  * @returns 0 on success, -1 on error.
  */
-int broadcast_service() {
+int broadcast_service(char * service) {
+	struct sockaddr_in local, remote;
+	socklen_t len=sizeof(local), rlen=sizeof(remote);
+	int sk, rval=0;
+	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
+	if ((sk = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		perror("broadcast socket error");
+		return -1;
+	}
+	
+	// enable broadcasting on socket
+	int option=1;
+	if (setsockopt(sk, SOL_SOCKET, SO_BROADCAST, &option, sizeof(option)) < 0) {
+		perror("broadcast setsockopt error");
+		return -1;
+	}
+
+	local.sin_family = AF_INET;
+	local.sin_port = htons(SERVER_PORT);
+	local.sin_addr.s_addr = INADDR_ANY;
+
+	if (bind(sk, (struct sockaddr *)&local, len) < 0) {
+		rval = -1;
+		goto bail;
+	}
+
+	remote.sin_family = AF_INET;
+	remote.sin_port = htons(MAPPER_PORT);
+	// Linux lab broadcast address is 137.148.254.255
+	// Local (In-Home) broadcast address 192.168.0/1.255
+	// Generic broadcast for Class D addresses is 255.255.255.255
+	remote.sin_addr.s_addr = inet_addr("137.148.254.255");
+
+	// Get the hostname from the local machin
+	char hostname[BUFMAX/4]; // hostname shouldn't be > 256 bytes
+	gethostname(hostname, BUFMAX/4);
+
+	// Get host addr via local dns, if not cached, this fails
+	struct hostent * hostentry = gethostbyname(hostname);
+    
+	// BUG REPORT: I had to search high and low to figure out that
+	//	host entries in h_addr_list are really in_addr pointers
+	// Finally found it after stumbling upon it as a note on IBMs
+	//	developer documentation of all things
+	// This caveat is not listed in standard C documentation on 
+	//	this function
+	struct in_addr * inaddr = (struct in_addr *)hostentry->h_addr_list[0];
+
+	char addr_str[32];
+	to_addr_string(inet_ntoa(*inaddr), local.sin_port, addr_str, sizeof(addr_str));
+
+	snprintf(sendbuf, sizeof(sendbuf), "PUT %s %s", service, addr_str);
+
+	// send to the mapper - does not block
+	sendto(sk, sendbuf, sizeof(sendbuf), 0, (struct sockaddr *)&remote, rlen);
+
+	// wait for the mappers response - this call blocks
+	recvfrom(sk, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&local, &len);
+
+bail:
+	close(sk);
+	return rval;
 }
 
 /**
@@ -168,6 +232,12 @@ int main(int argc, char * argv[]) {
 	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	int local_tcp_sk, remote_tcp_sk, udp_sk;
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
+
+	// broadcast the service to the mapper
+	if (broadcast_service("CISBANK") < 0) {
+		perror("broadcast error");
+		exit(1);
+	}
 
 	// register the child signal handler
 	if (signal(SIGCHLD, signal_handler) == SIG_ERR) {
