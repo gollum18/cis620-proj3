@@ -4,7 +4,8 @@
  * Changelog:
  *	03/13/2020 - Created initial version.
  *	03/15/2020 - Started net code.
- *	03/18/2020 - COntinued net code.
+ *	03/18/2020 - Continued net code.
+ *	03/20/2020 - Add in signal handler for child process.
  */
 
 #include <sys/types.h>
