@@ -6,6 +6,8 @@
 #include <sys/fcntl.h>
 #include "util.h"
 
+#define DBFILE "db20"
+
 struct record_t {
 	int acctnum;
 	char name[20];
