@@ -25,6 +25,9 @@
 #include "util.h"
 
 #define DBFILE "db20"
+#define HOME_BC_ADDR "192.168.0.255"
+#define COX_BC_ADDR "192.168.1.255"
+#define LLAB_BC_ADDR "137.148.254.255"
 
 struct record_t {
 	int acctnum;
@@ -150,7 +153,7 @@ void print_db() {
  * @param service The name of the service to advertise.
  * @returns 0 on success, -1 on error.
  */
-int broadcast_service(char * service) {
+int broadcast_service(char * service, char * broadcast_addr) {
 	struct sockaddr_in local, remote;
 	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	int sk, rval=0;
@@ -182,7 +185,7 @@ int broadcast_service(char * service) {
 	// Linux lab broadcast address is 137.148.254.255
 	// Local (In-Home) broadcast address 192.168.0/1.255
 	// Generic broadcast for Class D addresses is 255.255.255.255
-	remote.sin_addr.s_addr = inet_addr("137.148.254.255");
+	remote.sin_addr.s_addr = inet_addr(broadcast_addr);
 
 	// Get the hostname from the local machin
 	char hostname[BUFMAX/4]; // hostname shouldn't be > 256 bytes
@@ -234,7 +237,7 @@ int main(int argc, char * argv[]) {
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	// broadcast the service to the mapper
-	if (broadcast_service("CISBANK") < 0) {
+	if (broadcast_service("CISBANK", LLAB_BC_ADDR) < 0) {
 		perror("broadcast error");
 		exit(1);
 	}
