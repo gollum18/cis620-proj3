@@ -5,6 +5,12 @@
 #include <unistd.h>
 #include <sys/fcntl.h>
 
+#define CLIENT_PORT 7777
+#define SERVER_PORT 7777
+#define MAPPER_PORT 21896
+
+#define BUFMAX 1024
+
 #define MAX_ENTRIES 32
 #define NOT_FOUND MAX_ENTRIES+1
 
@@ -73,7 +79,10 @@ size_t page_entry() {
 		}
 	}
 
+	memset(addr_cache[pos].service, 0, sizeof(addr_cache[pos].service));
+	memset(addr_cache[pos].addr_info, 0, sizeof(addr_cache[pos].addr_info));
 	addr_cache[pos].occupied = 0;
+	addr_cache[pos].age = 0;
 
 	return pos;
 }
