@@ -1,3 +1,8 @@
+# ignore compiled output
+client
+server
+servicemap
+
 # Prerequisites
 *.d
 
