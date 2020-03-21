@@ -72,7 +72,12 @@ int get_service_address(char * service, char * broadcast_addr, char * recvbuf, s
 
 	sendto(sk, sendbuf, BUFMAX, 0, (struct sockaddr *)&remote, rlen);
 
-	// this call blocks
+	// BUG: This recv call corrupts the string sent from the
+	//	servicemap and I am not sure why - It may be the way that
+	//	the server is encoding the string and sending it to the 
+	//	client but as of rn, I'm not sure what's going on
+	// It's not the servicemap as I printed out what was being
+	//	sent and it's what I expect at home (127,0,1,1,97,31)
 	recvfrom(sk, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &rlen);
 
 bail:
@@ -94,7 +99,7 @@ int main(int argc, char * argv[])
 		exit(1);
 	}
 
-	// TODO: Convert the address string back to ip address/port
+	// Convert the address string back to ip address/port
 	from_addr_string(recvbuf, sizeof(recvbuf), &remote);
 
 	printf("Service provided by %s at port %d\n", inet_ntoa(remote.sin_addr), ntohs(remote.sin_port));
@@ -118,7 +123,7 @@ int main(int argc, char * argv[])
 	char cmdbuf[BUFMAX];
 	char * tokens[3]; // longest cmd is three tokens
 	while (1) {
-		printf("client: ");
+		printf(">: ");
 		fgets(cmdbuf, BUFMAX, stdin);
 		cmdbuf[strlen(cmdbuf)-1] = '\0'; // get rid of \n
 		parse_string(cmdbuf, tokens, 3, " ");

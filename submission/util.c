@@ -69,6 +69,8 @@ void from_addr_string(char * src,
     char * tokens[6];
     parse_string(src, tokens, 6, ",");
 
+	printf("Tokens: %s %s %s %s %s %s", tokens[0], tokens[1], tokens[2], tokens[3], tokens[4], tokens[5]);
+
     char buf[24];
     snprintf(buf, 24, "%s.%s.%s.%s%c", tokens[0], tokens[1], tokens[2], tokens[3], '\0');
 

@@ -169,6 +169,7 @@ int main(int argc, char * argv[]) {
 	}
 
 	while (1) {
+		memset(sendbuf, 0, BUFMAX);
 		memset(recvbuf, 0, BUFMAX);
 
 		// receive over the UDP socket, dest host is remote

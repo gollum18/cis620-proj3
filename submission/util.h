@@ -9,7 +9,7 @@
 #ifndef __UTIL__
 #define __UTIL__
 
-#define CLIENT_PORT 7777
+#define CLIENT_PORT 7776
 #define SERVER_PORT 7777
 #define MAPPER_PORT 21896
 
@@ -17,6 +17,10 @@
 
 #define QUERY_CODE 1000
 #define UPDATE_CODE 1001
+
+#define DOT0H_BC_ADDR "192.168.0.255"
+#define DOT1H_BC_ADDR "192.168.1.255"
+#define LLAB_BC_ADDR "137.148.254.255"
 
 // used to translate between port string and numeric port
 #define Q(p) (p/256) // Quotient, p = port
