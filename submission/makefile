@@ -6,22 +6,22 @@ PROJECT=proj3
 
 DEPENDS=db20 makefile
 HFILES=util.h
-SRCFILES=client.c server.c servicemap.c util.c
-OBJFILES=client.o server.o servicemap.o util.o
+SRCFILES=client.c server.c servicemap.c
+OBJFILES=client.o server.o servicemap.o
 EXEFILES=client server servicemap
 
 .PHONY: all clean submit depend
 
 all: $(EXEFILES)
 
-client: client.o util.o
-	gcc -o client client.o util.o
+client: client.o
+	gcc -o client client.o
 
-server: server.o util.o
-	gcc -o server server.o util.o
+server: server.o
+	gcc -o server server.o
 
-servicemap: servicemap.o util.o
-	gcc -o servicemap servicemap.o util.o
+servicemap: servicemap.o
+	gcc -o servicemap servicemap.o
 
 clean:
 	rm $(OBJFILES) $(EXEFILES)

@@ -22,7 +22,21 @@
 #include <sys/fcntl.h>
 #include <signal.h>
 #include <sys/wait.h>
-#include "util.h"
+
+#define SERVER_PORT 7777
+#define MAPPER_PORT 21896
+
+#define BUFMAX 1024
+
+#define QUERY_CODE 1000
+#define UPDATE_CODE 1001
+
+#define DOT0H_BC_ADDR "192.168.0.255"
+#define DOT1H_BC_ADDR "192.168.1.255"
+#define LLAB_BC_ADDR "137.148.254.255"
+
+#define Q(p) (p/256) // Quotient, p = port
+#define R(p) (p%256) // Remainder, p = port
 
 #define DBFILE "db20"
 
@@ -32,6 +46,43 @@ struct record_t {
 	float value;
 	int age;
 };
+
+struct query_t {
+	int code;
+	int acctnum;
+};
+
+struct update_t {
+	int code;
+	int acctnum;
+	float value;
+};
+
+void parse_string(char * src,
+				  char * dest[],
+				  size_t n,
+				  char * delim) {
+	int i = 1;
+	char * token = strtok(src, delim);
+	do {
+		dest[i++] = token;
+	} while (i < n && (token = strtok(NULL, delim)) != NULL);
+}
+
+void to_addr_string(char * addr,
+					unsigned short port,
+					char * dest,
+					size_t n) {
+	memset(dest, 0, n);
+
+	unsigned short quotient = Q(port);
+	unsigned short remainder = R(port);
+
+	char * tokens[4];
+	parse_string(addr, tokens, 4, ".");
+
+	snprintf(dest, n, "%s,%s,%s,%s,%d,%d%c", tokens[0], tokens[1], tokens[2], tokens[3], quotient, remainder, '\0');
+}
 
 /**
  * Attempts to query a record in the database.

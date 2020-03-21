@@ -22,6 +22,17 @@
 #define MAX_ENTRIES 32
 #define NOT_FOUND MAX_ENTRIES+1
 
+void parse_string(char * src,
+				  char * dest[],
+				  size_t n,
+				  char * delim) {
+	int i = 1;
+	char * token = strtok(src, delim);
+	do {
+		dest[i++] = token;
+	} while (i < n && (token = strtok(NULL, delim)) != NULL);
+}
+
 //###,###,###,###,###,###
 struct cache_entry_t {
 	char service[24];

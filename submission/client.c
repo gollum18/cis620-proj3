@@ -18,7 +18,56 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
-#include "util.h"
+
+#define CLIENT_PORT 7777
+#define MAPPER_PORT 21896
+
+#define BUFMAX 1024
+
+#define QUERY_CODE 1000
+#define UPDATE_CODE 1001
+
+#define DOT0h_BC_ADDR "192.168.0.255"
+#define DOT1H_BC_ADDR "192.168.1.255"
+#define LLAB_BC_ADDR "137.148.254.255"
+
+#define P(q, r) ((q*256) + r) // Port, q = quotient, r = remainder
+
+struct query_t {
+	int code;
+	int acctnum;
+};
+
+struct update_t {
+	int code;
+	int acctnum;
+	float value;
+};
+
+void parse_string(char * src, 
+				  char * dest[], 
+				  size_t n, 
+				  char * delim) {
+	int i = 1;
+	char * token = strtok(src, delim);
+	do {
+		dest[i++] = token;
+	} while (i < n && (token = strtok(NULL, delim)) != NULL);
+}
+
+void from_addr_string(char * src, 
+					  size_t n, 
+					  struct sockaddr_in * dest) {
+	char * tokens[6];
+	parse_string(src, tokens, 6, ".");
+
+	char buf[24];
+	snprintf(buf, 24, "%s.%s.%s.%s%c", tokens[0], tokens[1], tokens[2], tokens[3], '\0');
+
+	inet_aton(buf, (struct in_addr *)dest);
+	// port is already in network byte order
+	dest->sin_port = P(atoi(tokens[4]), atoi(tokens[5]));
+}
 
 void print_help() 
 {
