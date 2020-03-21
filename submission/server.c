@@ -279,6 +279,8 @@ int main(int argc, char * argv[]) {
 			exit(1);
 		}
 
+		printf("Service requested from %s\n", inet_ntoa(remote.sin_addr));
+
 		pid_t cpid = fork();
 		if (cpid == 0) { // child
 			close(local_tcp_sk);

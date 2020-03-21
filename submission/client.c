@@ -5,6 +5,7 @@
  *	03/15/2020 - Started net code.
  *	03/18/2020 - Continued net code.
  *	03/20/2020 - Change size_t to socklen_t.
+ *	03/21/2020 - Refactor get_service_address.
  */
 
 #include <sys/types.h>
@@ -25,47 +26,54 @@ void print_help()
 	printf("\thelp\n");
 	printf("\tquery <acctnum>\n");
 	printf("\tupdate <acctnum> <value>\n");
-	printf("\texit\n\n");
+	printf("\tquit\n\n");
 }
 
 /**
  * Attempts to retrieve a service address via UDP broadcasting.
- * @param local The local initialized socket address.
- * @param len The size of local in bytes.
+ * @param service The service to try to get address string of.
+ * @param broadcast_addr The address to broadcast to.
  * @param recvbuf The buffer to write the address string back to.
  * @param n The size of recvbuf in bytes.
  * @param service The service to query.
  */
-int get_service_address(struct sockaddr_in local, 
-						 size_t len, 
-						 char * recvbuf, 
-						 size_t n,
-						 char * service)
-{
-	struct sockaddr_in remote;
-	size_t rlen=sizeof(remote);
-	char sendbuf[BUFMAX];
+int get_service_address(char * service, char * broadcast_addr, char * recvbuf, size_t n) {
+	struct sockaddr_in local, remote;
+	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	int sk, rval=0;
-
-	remote.sin_family = AF_INET;
-	remote.sin_port = htons(MAPPER_PORT);
-	remote.sin_addr.s_addr = inet_addr("255.255.255.255");
-
-	snprintf(sendbuf, BUFMAX, "GET %s", service);
-
+	char sendbuf[BUFMAX];
+	
 	if ((sk = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		return -1;
 	}
+
+	// enable broadcasting on socket
+	int option=1;
+	if (setsockopt(sk, SOL_SOCKET, SO_BROADCAST, &option, sizeof(option))) {
+		perror("broadcast setsocket error");
+		rval = -1;
+		goto bail;
+	}
+
+	local.sin_family = AF_INET;
+	local.sin_port = htons(CLIENT_PORT);
+	local.sin_addr.s_addr = INADDR_ANY;
+
+	remote.sin_family = AF_INET;
+	remote.sin_port = htons(MAPPER_PORT);
+	remote.sin_addr.s_addr = inet_addr(broadcast_addr);
 
 	if (bind(sk, (struct sockaddr *)&local, len) < 0) {
 		rval=-1;
 		goto bail;
 	}
 
+	snprintf(sendbuf, BUFMAX, "GET %s", service);
+
 	sendto(sk, sendbuf, BUFMAX, 0, (struct sockaddr *)&remote, rlen);
 
 	// this call blocks
-	recv(sk, recvbuf, BUFMAX, 0);
+	recvfrom(sk, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &rlen);
 
 bail:
 	close(sk);
@@ -81,12 +89,15 @@ int main(int argc, char * argv[])
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	// Broadcast a request to the mapper for the addr string
-	if (get_service_address(local, len, recvbuf, BUFMAX, "CISBANK") < 0) {
+	if (get_service_address("CISBANK", DOT1H_BC_ADDR, recvbuf, sizeof(recvbuf)) < 0) {
 		perror("broadcast error");
 		exit(1);
 	}
 
 	// TODO: Convert the address string back to ip address/port
+	from_addr_string(recvbuf, sizeof(recvbuf), &remote);
+
+	printf("Service provided by %s at port %d\n", inet_ntoa(remote.sin_addr), ntohs(remote.sin_port));
 
 	// setup the local TCP socket
 	if ((local_sk = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -118,7 +129,7 @@ int main(int argc, char * argv[])
 			// TODO: Build an update request and sent to database
 		} else if (strcmp(tokens[0], "help") == 0) {
 			print_help();
-		} else if (strcmp(tokens[0], "exit") == 0) {
+		} else if (strcmp(tokens[0], "quit") == 0) {
 			break;
 		} else {
 			printf("<<<Invalid command entered, try \'help\' to see a list of valid commands.>>>\n");
