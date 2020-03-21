@@ -167,7 +167,7 @@ int broadcast_service(char * service, char * broadcast_addr) {
 	if (setsockopt(sk, SOL_SOCKET, SO_BROADCAST, &option, sizeof(option)) < 0) {
 		perror("broadcast setsockopt error");
 		rval = -1;
-		goto bail;;
+		goto bail;
 	}
 
 	local.sin_family = AF_INET;
@@ -211,8 +211,9 @@ int broadcast_service(char * service, char * broadcast_addr) {
 	sendto(sk, sendbuf, sizeof(sendbuf), 0, (struct sockaddr *)&remote, rlen);
 
 	// wait for the mappers response - this call blocks
-	recvfrom(sk, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&local, &len);
+	recvfrom(sk, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &rlen);
 
+	printf("Registration %s from %s\n", recvbuf, inet_ntoa(remote.sin_addr));
 bail:
 	close(sk);
 	return rval;
