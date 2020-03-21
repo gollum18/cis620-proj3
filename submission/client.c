@@ -75,7 +75,7 @@ int get_service_address(char * service, char * broadcast_addr, char * recvbuf, s
 	// BUG: This recv call corrupts the string sent from the
 	//	servicemap and I am not sure why - It may be the way that
 	//	the server is encoding the string and sending it to the 
-	//	client but as of rn, I'm not sure what's going on
+	//	servicemap but as of rn, I'm not sure what's going on
 	// It's not the servicemap as I printed out what was being
 	//	sent and it's what I expect at home (127,0,1,1,97,31)
 	recvfrom(sk, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &rlen);
