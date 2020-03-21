@@ -25,9 +25,6 @@
 #include "util.h"
 
 #define DBFILE "db20"
-#define HOME_BC_ADDR "192.168.0.255"
-#define COX_BC_ADDR "192.168.1.255"
-#define LLAB_BC_ADDR "137.148.254.255"
 
 struct record_t {
 	int acctnum;
@@ -151,6 +148,7 @@ void print_db() {
 /**
  * Broadcasts the service to the service mapper.
  * @param service The name of the service to advertise.
+ * @param broadcast_addr The IPV4 broadcast address advertise to.
  * @returns 0 on success, -1 on error.
  */
 int broadcast_service(char * service, char * broadcast_addr) {
@@ -168,7 +166,8 @@ int broadcast_service(char * service, char * broadcast_addr) {
 	int option=1;
 	if (setsockopt(sk, SOL_SOCKET, SO_BROADCAST, &option, sizeof(option)) < 0) {
 		perror("broadcast setsockopt error");
-		return -1;
+		rval = -1;
+		goto bail;;
 	}
 
 	local.sin_family = AF_INET;
@@ -176,6 +175,7 @@ int broadcast_service(char * service, char * broadcast_addr) {
 	local.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(sk, (struct sockaddr *)&local, len) < 0) {
+		perror("broadcast bind error");
 		rval = -1;
 		goto bail;
 	}
@@ -237,7 +237,7 @@ int main(int argc, char * argv[]) {
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	// broadcast the service to the mapper
-	if (broadcast_service("CISBANK", LLAB_BC_ADDR) < 0) {
+	if (broadcast_service("CISBANK", DOT1H_BC_ADDR) < 0) {
 		perror("broadcast error");
 		exit(1);
 	}

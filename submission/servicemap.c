@@ -179,17 +179,20 @@ int main(int argc, char * argv[]) {
 
 		if (strcmp(tokens[0], "PUT") == 0) { // PUT command
 			// locally store the address
+			printf("Received from %s: PUT %s %s\n", inet_ntoa(remote.sin_addr), tokens[1], tokens[2]);
 			put_entry(tokens[1], tokens[2]);
+			strncpy(sendbuf, "OK", sizeof(sendbuf));
 		} else if (strcmp(tokens[0], "GET") == 0) { // GET command
+			printf("Received from %s: GET %s\n", inet_ntoa(remote.sin_addr), tokens[1]);
 			// retrieve the entry
 			char * addr_info = get_entry(tokens[1]);
 			if (addr_info == NULL) { // error
-
+				strncpy(sendbuf, "FAIL", sizeof(sendbuf));
 			} else {
 				strncpy(sendbuf, addr_info, sizeof(sendbuf));
 			}
 		} else { // error
-
+			strncpy(sendbuf, "FAIL", sizeof(sendbuf));
 		}
 
 		// send the message to the dest host
