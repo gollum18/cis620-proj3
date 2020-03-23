@@ -17,7 +17,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
-#include "util.h"
 
 #define MAX_ENTRIES 32
 #define NOT_FOUND MAX_ENTRIES+1

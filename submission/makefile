@@ -5,7 +5,6 @@ CLASS=cis620s
 PROJECT=proj3
 
 DEPENDS=db20 makefile
-HFILES=util.h
 SRCFILES=client.c server.c servicemap.c
 OBJFILES=client.o server.o servicemap.o
 EXEFILES=client server servicemap
@@ -27,7 +26,7 @@ clean:
 	rm $(OBJFILES) $(EXEFILES)
 
 submit:
-	turnin -c $(CLASS) -p $(PROJECT) $(SRCFILES) $(HFILES) $(DEPENDS)
+	turnin -c $(CLASS) -p $(PROJECT) $(SRCFILES) $(DEPENDS)
 
 depend:
 	makedepend $(IFLAGS) $(SRCFILES)
@@ -76,7 +75,7 @@ client.o: /usr/include/bits/environments.h /usr/include/bits/confname.h
 client.o: /usr/include/bits/getopt_posix.h /usr/include/bits/getopt_core.h
 client.o: /usr/include/sys/fcntl.h /usr/include/fcntl.h
 client.o: /usr/include/bits/fcntl.h /usr/include/bits/fcntl-linux.h
-client.o: /usr/include/bits/stat.h util.h
+client.o: /usr/include/bits/stat.h
 server.o: /usr/include/sys/types.h /usr/include/features.h
 server.o: /usr/include/stdc-predef.h /usr/include/sys/cdefs.h
 server.o: /usr/include/bits/wordsize.h /usr/include/bits/long-double.h
@@ -103,12 +102,13 @@ server.o: /usr/include/asm/sockios.h /usr/include/asm-generic/sockios.h
 server.o: /usr/include/bits/types/struct_osockaddr.h
 server.o: /usr/include/netinet/ip.h /usr/include/netinet/in.h
 server.o: /usr/include/bits/stdint-uintn.h /usr/include/bits/in.h
-server.o: /usr/include/arpa/inet.h /usr/include/stdlib.h
-server.o: /usr/include/bits/libc-header-start.h /usr/include/bits/waitflags.h
-server.o: /usr/include/bits/waitstatus.h /usr/include/bits/floatn.h
-server.o: /usr/include/bits/floatn-common.h /usr/include/alloca.h
-server.o: /usr/include/bits/stdlib-float.h /usr/include/string.h
-server.o: /usr/include/bits/types/locale_t.h
+server.o: /usr/include/arpa/inet.h /usr/include/netdb.h
+server.o: /usr/include/rpc/netdb.h /usr/include/bits/netdb.h
+server.o: /usr/include/stdlib.h /usr/include/bits/libc-header-start.h
+server.o: /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h
+server.o: /usr/include/bits/floatn.h /usr/include/bits/floatn-common.h
+server.o: /usr/include/alloca.h /usr/include/bits/stdlib-float.h
+server.o: /usr/include/string.h /usr/include/bits/types/locale_t.h
 server.o: /usr/include/bits/types/__locale_t.h /usr/include/strings.h
 server.o: /usr/include/stdio.h /usr/include/bits/types/__FILE.h
 server.o: /usr/include/bits/types/FILE.h /usr/include/bits/libio.h
@@ -119,7 +119,20 @@ server.o: /usr/include/bits/environments.h /usr/include/bits/confname.h
 server.o: /usr/include/bits/getopt_posix.h /usr/include/bits/getopt_core.h
 server.o: /usr/include/sys/fcntl.h /usr/include/fcntl.h
 server.o: /usr/include/bits/fcntl.h /usr/include/bits/fcntl-linux.h
-server.o: /usr/include/bits/stat.h util.h
+server.o: /usr/include/bits/stat.h /usr/include/signal.h
+server.o: /usr/include/bits/signum.h /usr/include/bits/signum-generic.h
+server.o: /usr/include/bits/types/sig_atomic_t.h
+server.o: /usr/include/bits/types/siginfo_t.h
+server.o: /usr/include/bits/types/__sigval_t.h
+server.o: /usr/include/bits/siginfo-arch.h /usr/include/bits/siginfo-consts.h
+server.o: /usr/include/bits/types/sigval_t.h
+server.o: /usr/include/bits/types/sigevent_t.h
+server.o: /usr/include/bits/sigevent-consts.h /usr/include/bits/sigaction.h
+server.o: /usr/include/bits/sigcontext.h /usr/include/bits/types/stack_t.h
+server.o: /usr/include/sys/ucontext.h /usr/include/bits/sigstack.h
+server.o: /usr/include/bits/ss_flags.h
+server.o: /usr/include/bits/types/struct_sigstack.h
+server.o: /usr/include/bits/sigthread.h /usr/include/sys/wait.h
 servicemap.o: /usr/include/sys/types.h /usr/include/features.h
 servicemap.o: /usr/include/stdc-predef.h /usr/include/sys/cdefs.h
 servicemap.o: /usr/include/bits/wordsize.h /usr/include/bits/long-double.h
@@ -164,4 +177,4 @@ servicemap.o: /usr/include/bits/posix_opt.h /usr/include/bits/environments.h
 servicemap.o: /usr/include/bits/confname.h /usr/include/bits/getopt_posix.h
 servicemap.o: /usr/include/bits/getopt_core.h /usr/include/sys/fcntl.h
 servicemap.o: /usr/include/fcntl.h /usr/include/bits/fcntl.h
-servicemap.o: /usr/include/bits/fcntl-linux.h /usr/include/bits/stat.h util.h
+servicemap.o: /usr/include/bits/fcntl-linux.h /usr/include/bits/stat.h
