@@ -6,7 +6,7 @@ PROJECT=proj3
 
 DEPENDS=db20 makefile
 HFILES=util.h
-SRCFILES=client.c server.c servicemap.c
+SRCFILES=report.pdf client.c server.c servicemap.c
 OBJFILES=client.o server.o servicemap.o
 EXEFILES=client server servicemap
 
