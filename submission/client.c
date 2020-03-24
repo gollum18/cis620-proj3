@@ -84,8 +84,9 @@ void print_help()
  * @param query A pointer to a query_t struct to initialize.
  * @param acctnum The account number to query.
  */
-void init_query(struct query_t * query, int acctnum) {
-    query->acctnum = htonl(acctnum);
+void init_query(struct query_t * query, int code, int acctnum) {
+    query->code = htonl(code);
+	query->acctnum = htonl(acctnum);
 }
 
 /**
@@ -94,8 +95,9 @@ void init_query(struct query_t * query, int acctnum) {
  * @param acctnum The account number to update.
  * @param value The value to update the account with.
  */
-void init_update(struct update_t * update, int acctnum, float value) {
-    update->acctnum = htonl(acctnum);
+void init_update(struct update_t * update, int code, int acctnum, float value) {
+    update->code = htonl(code);
+	update->acctnum = htonl(acctnum);
     int *ip = (int*)&value;
     *ip = htonl(*ip); //can be ntohl or htonl
 }
@@ -239,9 +241,8 @@ int main(int argc, char * argv[])
 		parse_string(cmdbuf, tokens, 3, " ");
 
 		if (strcmp(tokens[0], "query") == 0) {
-			// TODO: Build a query request and send to database
             struct query_t query;
-            init_query(&query, atoi(tokens[1]));
+            init_query(&query, QUERY_CODE, atoi(tokens[1]));
 			memcpy(sendbuf, &query, sizeof(query));
 			if (connect_and_send(local_sk, 
 								 &remote, 
@@ -257,7 +258,7 @@ int main(int argc, char * argv[])
 		} else if (strcmp(tokens[0], "update") == 0) {
 			// TODO: Build an update request and sent to database
             struct update_t update;
-            init_update(&update, atoi(tokens[1]), strtof(tokens[2], NULL));
+            init_update(&update, UPDATE_CODE, atoi(tokens[1]), strtof(tokens[2], NULL));
 			memcpy(sendbuf, &update, sizeof(update));
 			if (connect_and_send(local_sk, 
 								 &remote, 

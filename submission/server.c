@@ -86,6 +86,30 @@ void to_addr_string(char * addr,
 }
 
 /**
+ * Parses a query into dest from src.
+ * @param dest The destination struct to write to.
+ * @param src The source buffer to read from.
+ */
+void parse_query(struct query_t * dest, char * src) {
+	memcpy(dest, src, sizeof(struct query_t));
+	dest->code = ntohl(dest->code);
+	dest->acctnum = ntohl(dest->acctnum);
+}
+
+/**
+ * Parses an update into dest from src.
+ * @param dest The destination struct to write to.
+ * @param src The source buffer to read from.
+ */
+void parse_update(struct update_t * dest, char * src) {
+	memcpy(dest, src, sizeof(struct update_t));
+	dest->code = ntohl(dest->code);
+	dest->acctnum = ntohl(dest->acctnum);
+	int *ip = (int *)&dest->value;
+	*ip = ntohl(*ip);
+}
+
+/**
  * Attempts to query a record in the database.
  * @param acctnum The account number of the record to query.
  * @param dest A pointer to a record_t to write the record back to.
@@ -343,8 +367,7 @@ int main(int argc, char * argv[]) {
 			}
 
 			if (sizeof(recvbuf) == sizeof(struct query_t)) {
-				memcpy(&query_msg, recvbuf, sizeof(struct query_t));
-				query_msg.code = ntohl(query_msg.code);
+				parse_query(&query_msg, recvbuf);
 				
 				if (query_msg.code == QUERY_CODE) {
 					struct record_t record;
@@ -359,9 +382,7 @@ int main(int argc, char * argv[]) {
 					}
 				}
 			} else if (sizeof(recvbuf) == sizeof(struct update_t)) {
-				memcpy(&update_msg, recvbuf, sizeof(struct update_t));
-				update_msg.code = ntohl(query_msg.code);
-				// TODO: Convert the value back to host-byte order
+				parse_update(&update_msg, recvbuf);
 
 				if (update_msg.code == UPDATE_CODE) {
 					// error
