@@ -8,6 +8,9 @@
  *	03/21/2020 - Refactor get_service_address.
  *  03/24/2020 - Implement changes to broadcasting.
 			     Introduce addr_info_t type to fix recv issue.
+ * Bugs:
+ *	03/25/2020 - Client connects successfully to server by
+ *				 immediately closes when calling query.
  */
 
 #include <sys/types.h>
@@ -249,17 +252,24 @@ int main(int argc, char * argv[])
 		printf(">: ");
 		fgets(cmdbuf, BUFMAX, stdin); // fgets leaves \n at eos
 		cmdbuf[strlen(cmdbuf)-1] = '\0'; // get rid of \n
+		// BUG REPORT: This prevents a segfault when no input
+		// is entered. When no input is entered, the above line
+		// makes cmdbuf contain the string "\0" from "\n".
+		if (strlen(cmdbuf) == 0) {
+			continue;
+		}
 		parse_string(cmdbuf, tokens, 3, " ");
 
 		if (strcmp(tokens[0], "query") == 0) {
+			printf("QUERY RECEIVED");
 			init_query(&query, QUERY_CODE, atoi(tokens[1]));
-			memcpy(sendbuf, &query, sizeof(query));
+			memcpy(sendbuf, &query, sizeof(struct query_t));
 			
 			if (connect_and_send(local_sk, 
 								 &remote, 
 								 rlen, 
 								 sendbuf, 
-								 sizeof(sendbuf), 
+								 sizeof(struct query_t), 
 								 recvbuf, 
 								 sizeof(recvbuf)) < 0) { // error
 				// TODO: Maybe print error here?
@@ -269,13 +279,13 @@ int main(int argc, char * argv[])
 		} else if (strcmp(tokens[0], "update") == 0) {
 			// TODO: Build an update request and sent to database
 			init_update(&update, UPDATE_CODE, atoi(tokens[1]), strtof(tokens[2], NULL));
-			memcpy(sendbuf, &update, sizeof(update));
+			memcpy(sendbuf, &update, sizeof(struct update_t));
 			
 			if (connect_and_send(local_sk, 
 								 &remote, 
 								 rlen, 
 								 sendbuf, 
-								 sizeof(sendbuf), 
+								 sizeof(struct update_t), 
 								 recvbuf, 
 								 sizeof(recvbuf)) < 0) { // error
 				// TODO: Maybe print error here?

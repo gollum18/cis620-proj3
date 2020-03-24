@@ -22,7 +22,7 @@
 
 #define BUFMAX 1024
 
-#define CLIENT_PORT 7777
+#define CLIENT_PORT 7776
 #define SERVER_PORT 7777 
 #define MAPPER_PORT 21896
 

@@ -80,6 +80,8 @@ void to_addr_string(char * addr,
 					unsigned short port,
 					char * dest,
 					size_t n) {
+	port = htons(port);
+	
 	memset(dest, 0, n);
 
 	char * tokens[4];
