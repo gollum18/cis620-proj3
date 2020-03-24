@@ -8,6 +8,8 @@
  *	03/20/2020 - Add in signal handler for child process.
  *			   - Change size_t to socklen_t.
  *			   - Implement service broadcasting.
+ *  03/24/2020 - Implement changes to broadcasting.
+ *			   - Add in addr_info_t type to fix recv at client
  */
 
 #include <sys/types.h>
@@ -48,6 +50,10 @@ struct record_t {
 	int age;
 };
 
+struct addr_info_t {
+	char addr_info[24];
+};
+
 struct query_t {
 	int code;
 	int acctnum;
@@ -76,13 +82,10 @@ void to_addr_string(char * addr,
 					size_t n) {
 	memset(dest, 0, n);
 
-	unsigned short quotient = Q(port);
-	unsigned short remainder = R(port);
-
 	char * tokens[4];
 	parse_string(addr, tokens, 4, ".");
 
-	snprintf(dest, n, "%s,%s,%s,%s,%d,%d%c", tokens[0], tokens[1], tokens[2], tokens[3], quotient, remainder, '\0');
+	snprintf(dest, n, "%s,%s,%s,%s,%d,%d%c", tokens[0], tokens[1], tokens[2], tokens[3], Q(port), R(port), '\0');
 }
 
 /**
@@ -228,6 +231,7 @@ void print_db() {
  * @returns 0 on success, -1 on error.
  */
 int broadcast_service(char * service, char * broadcast_addr) {
+	struct addr_info_t s_addr_info;
 	struct sockaddr_in local, remote;
 	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	int sk, rval=0;
@@ -278,10 +282,9 @@ int broadcast_service(char * service, char * broadcast_addr) {
 	//	this function
 	struct in_addr * inaddr = (struct in_addr *)hostentry->h_addr_list[0];
 
-	char addr_str[32];
-	to_addr_string(inet_ntoa(*inaddr), local.sin_port, addr_str, sizeof(addr_str));
+	to_addr_string(inet_ntoa(*inaddr), local.sin_port, s_addr_info.addr_info, sizeof(s_addr_info.addr_info));
 
-	snprintf(sendbuf, sizeof(sendbuf), "PUT %s %s", service, addr_str);
+	snprintf(sendbuf, sizeof(sendbuf), "PUT %s %s", service, s_addr_info.addr_info);
 
 	// send to the mapper - does not block
 	sendto(sk, sendbuf, sizeof(sendbuf), 0, (struct sockaddr *)&remote, rlen);
@@ -290,6 +293,7 @@ int broadcast_service(char * service, char * broadcast_addr) {
 	recvfrom(sk, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &rlen);
 
 	printf("Registration %s from %s\n", recvbuf, inet_ntoa(remote.sin_addr));
+
 bail:
 	close(sk);
 	return rval;
@@ -310,58 +314,58 @@ int main(int argc, char * argv[]) {
 	struct update_t update_msg;
 	struct sockaddr_in local, remote;
 	socklen_t len=sizeof(local), rlen=sizeof(remote);
-	int local_tcp_sk, remote_tcp_sk, udp_sk;
+	int local_sk=0, remote_sk=0, rval=0;
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	// broadcast the service to the mapper
 	if (broadcast_service("CISBANK", BROADCAST_ADDR) < 0) {
 		perror("broadcast error");
-		exit(1);
+		return 1;
 	}
 
-	// register the child signal handler
+	// register the child signal handler to cleanup child procs
 	if (signal(SIGCHLD, signal_handler) == SIG_ERR) {
 		perror("SIGCHLD");
-		exit(1);
+		return 1;
 	}
 
-	if ((local_tcp_sk = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+	if ((local_sk = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		perror("socket error");
-		exit(1);
+		return 1;
 	}
 
 	local.sin_family = AF_INET;
 	local.sin_port = htons(SERVER_PORT);
 	local.sin_addr.s_addr = INADDR_ANY;
 
-	if (bind(local_tcp_sk, (struct sockaddr *)&local, len) < 0) {
+	if (bind(local_sk, (struct sockaddr *)&local, len) < 0) {
 		perror("bind error");
-		close(local_tcp_sk);
-		exit(1);
+		rval = 1;
+		goto bail;
 	}
 
-	if (listen(local_tcp_sk, 5) < 0) {
+	if (listen(local_sk, 5) < 0) {
 		perror("listen error");
-		close(local_tcp_sk);
-		exit(1);
+		rval = 1;
+		goto bail;
 	}
 
 	while (1) {
 		// accept blocks
-		if ((remote_tcp_sk = 
-					accept(local_tcp_sk, (struct sockaddr *)&remote, (socklen_t *)&rlen)) < 0) {
+		if ((remote_sk = 
+				accept(local_sk, (struct sockaddr *)&remote, (socklen_t *)&rlen)) < 0) {
 			perror("accept error");
-			close(local_tcp_sk);
-			exit(1);
+			rval = 1;
+			goto bail;
 		}
 
 		printf("Service requested from %s\n", inet_ntoa(remote.sin_addr));
 
 		pid_t cpid = fork();
 		if (cpid == 0) { // child
-			close(local_tcp_sk);
-			if (read(remote_tcp_sk, recvbuf, BUFMAX) < 0) {
-				close(remote_tcp_sk);
+			close(local_sk);
+			if (read(remote_sk, recvbuf, BUFMAX) < 0) {
+				close(remote_sk);
 				perror("child read error");
 				exit(-1);
 			}
@@ -377,7 +381,8 @@ int main(int argc, char * argv[]) {
 						// TODO: Write error to sendbuf
 					} else { // no error
 						record.acctnum = htonl(record.acctnum);
-						// TODO: Convert the value to nbyte order
+						int * ip = (int *)&(record.value);
+						*ip = htonl(*ip);
 						memcpy(sendbuf, &record, sizeof(struct record_t));
 					}
 				}
@@ -395,23 +400,25 @@ int main(int argc, char * argv[]) {
 				}
 			} else {
 				perror("child command error");
-				close(remote_tcp_sk);
+				close(remote_sk);
 				exit(1);
 			}
 
 			// TODO: Send the response to the client
-			send(remote_tcp_sk, sendbuf, BUFMAX, 0);
+			send(remote_sk, sendbuf, BUFMAX, 0);
 
-			close(remote_tcp_sk);
+			close(remote_sk);
 			exit(0);
 		} else if (cpid > 0) { // parent
-			close(remote_tcp_sk);
+			close(remote_sk);
 		} else { // error
 			perror("fork error");
-			close(local_tcp_sk);
-			exit(1);
+			rval = 1;
+			goto bail;
 		}
 	}
 
-	return 0;
+bail:
+	close(local_sk);
+	return rval;
 }

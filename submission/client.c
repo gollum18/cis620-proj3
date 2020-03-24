@@ -6,6 +6,8 @@
  *	03/18/2020 - Continued net code.
  *	03/20/2020 - Change size_t to socklen_t.
  *	03/21/2020 - Refactor get_service_address.
+ *  03/24/2020 - Implement changes to broadcasting.
+			     Introduce addr_info_t type to fix recv issue.
  */
 
 #include <sys/types.h>
@@ -19,7 +21,7 @@
 #include <unistd.h>
 #include <sys/fcntl.h>
 
-#define CLIENT_PORT 7777
+#define CLIENT_PORT 7776
 #define MAPPER_PORT 21896
 
 #define BUFMAX 1024
@@ -32,7 +34,11 @@
 #define LLAB_BC_ADDR "137.148.254.255" // Use this for the submission
 #define BROADCAST_ADDR DOT1H_BC_ADDR // change this to change the broadcast address
 
-#define P(q, r) ((q*256) + r) // Port, q = quotient, r = remainder
+#define P(q, r) (q*256) + r // Port, q = quotient, r = remainder
+
+struct addr_info_t {
+	char addr_info[24];
+};
 
 struct query_t {
 	int code;
@@ -60,12 +66,12 @@ void from_addr_string(char * src,
 					  size_t n, 
 					  struct sockaddr_in * dest) {
 	char * tokens[6];
-	parse_string(src, tokens, 6, ".");
+	parse_string(src, tokens, 6, ",");
 
 	char buf[24];
-	snprintf(buf, 24, "%s.%s.%s.%s%c", tokens[0], tokens[1], tokens[2], tokens[3], '\0');
+	snprintf(buf, 24, "%s.%s.%s.%s", tokens[0], tokens[1], tokens[2], tokens[3]);
 
-	inet_aton(buf, (struct in_addr *)dest);
+	inet_aton(buf, &(dest->sin_addr));
 	// port is already in network byte order
 	dest->sin_port = P(atoi(tokens[4]), atoi(tokens[5]));
 }
@@ -115,6 +121,9 @@ int get_service_address(char * service, char * broadcast_addr, char * recvbuf, s
 	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	int sk, rval=0;
 	char sendbuf[BUFMAX];
+
+	memset(sendbuf, 0, sizeof(sendbuf));
+	memset(recvbuf, 0, n);
 	
 	if ((sk = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 		return -1;
@@ -145,13 +154,12 @@ int get_service_address(char * service, char * broadcast_addr, char * recvbuf, s
 
 	sendto(sk, sendbuf, BUFMAX, 0, (struct sockaddr *)&remote, rlen);
 
-	// BUG: This recv call corrupts the string sent from the
-	//	servicemap and I am not sure why - It may be the way that
-	//	the server is encoding the string and sending it to the 
-	//	servicemap but as of rn, I'm not sure what's going on
-	// It's not the servicemap as I printed out what was being
-	//	sent and it's what I expect at home (127,0,1,1,97,31)
-	recvfrom(sk, recvbuf, sizeof(recvbuf), 0, (struct sockaddr *)&remote, &rlen);
+	recvfrom(sk, recvbuf, sizeof(struct addr_info_t), 0, (struct sockaddr *)&remote, &rlen);
+
+	struct addr_info_t s_addr_info;
+	memcpy(&s_addr_info, recvbuf, sizeof(struct addr_info_t));
+	memset(recvbuf, 0, sizeof(recvbuf));
+	strcpy(recvbuf, s_addr_info.addr_info);
 
 bail:
 	close(sk);
@@ -176,7 +184,7 @@ int connect_and_send(int local_sk,
 					 size_t sendlen, 
 					 char * recvbuf, 
 					 size_t recvlen) {
-	// duplicate the socket
+	// duplicate the socket: never connect w/original client socket
 	int remote_sk = dup(local_sk);
 	
 	// connect on the duplicate
@@ -191,7 +199,7 @@ int connect_and_send(int local_sk,
 	// attempt to receive
 	recv(local_sk, recvbuf, recvlen, 0);
 
-	// close the duplicate
+	// close the duplicate socket
 	close(remote_sk);
 
 	return 0;
@@ -200,26 +208,28 @@ int connect_and_send(int local_sk,
 int main(int argc, char * argv[]) 
 {
 	// networking variables
+	struct query_t query;
+	struct update_t update;
 	struct sockaddr_in local, remote;
-	int local_sk=0;
+	int local_sk=0, rval=0;
 	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	// Broadcast a request to the mapper for the addr string
 	if (get_service_address("CISBANK", BROADCAST_ADDR, recvbuf, sizeof(recvbuf)) < 0) {
 		perror("broadcast error");
-		exit(1);
+		return 1;
 	}
 
 	// Convert the address string back to ip address/port
 	from_addr_string(recvbuf, sizeof(recvbuf), &remote);
 
-	printf("Service provided by %s at port %d\n", inet_ntoa(remote.sin_addr), ntohs(remote.sin_port));
+	printf("Service provided by %s at port %d\n", inet_ntoa(remote.sin_addr), remote.sin_port);
 
 	// setup the local TCP socket
 	if ((local_sk = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
 		perror("socket error");
-		exit(1);
+		return 1;
 	}
 
 	local.sin_family = AF_INET;
@@ -228,7 +238,8 @@ int main(int argc, char * argv[])
 
 	if (bind(local_sk, (struct sockaddr *)&local, len) < 0) {
 		perror("bind error");
-		exit(1);
+		rval = 1;
+		goto bail;
 	}
 
 	// local cmd prompt variables
@@ -241,9 +252,9 @@ int main(int argc, char * argv[])
 		parse_string(cmdbuf, tokens, 3, " ");
 
 		if (strcmp(tokens[0], "query") == 0) {
-            struct query_t query;
-            init_query(&query, QUERY_CODE, atoi(tokens[1]));
+			init_query(&query, QUERY_CODE, atoi(tokens[1]));
 			memcpy(sendbuf, &query, sizeof(query));
+			
 			if (connect_and_send(local_sk, 
 								 &remote, 
 								 rlen, 
@@ -252,14 +263,14 @@ int main(int argc, char * argv[])
 								 recvbuf, 
 								 sizeof(recvbuf)) < 0) { // error
 				// TODO: Maybe print error here?
-			} else {
+			} else { // no error
 
 			}
 		} else if (strcmp(tokens[0], "update") == 0) {
 			// TODO: Build an update request and sent to database
-            struct update_t update;
-            init_update(&update, UPDATE_CODE, atoi(tokens[1]), strtof(tokens[2], NULL));
+			init_update(&update, UPDATE_CODE, atoi(tokens[1]), strtof(tokens[2], NULL));
 			memcpy(sendbuf, &update, sizeof(update));
+			
 			if (connect_and_send(local_sk, 
 								 &remote, 
 								 rlen, 
@@ -268,7 +279,7 @@ int main(int argc, char * argv[])
 								 recvbuf, 
 								 sizeof(recvbuf)) < 0) { // error
 				// TODO: Maybe print error here?
-			} else {
+			} else { // no error
 
 			}
 		} else if (strcmp(tokens[0], "help") == 0) {
@@ -280,6 +291,7 @@ int main(int argc, char * argv[])
 		}
 	}
 
+bail:
 	close(local_sk);
-	return 0;
+	return rval;
 }
