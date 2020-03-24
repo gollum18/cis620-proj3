@@ -27,9 +27,10 @@
 #define QUERY_CODE 1000
 #define UPDATE_CODE 1001
 
-#define DOT0h_BC_ADDR "192.168.0.255"
-#define DOT1H_BC_ADDR "192.168.1.255"
-#define LLAB_BC_ADDR "137.148.254.255"
+#define DOT0H_BC_ADDR "192.168.0.255" // Try this 1 first
+#define DOT1H_BC_ADDR "192.168.1.255" // If the above doesn't work, try this one
+#define LLAB_BC_ADDR "137.148.254.255" // Use this for the submission
+#define BROADCAST_ADDR DOT1H_BC_ADDR // change this to change the broadcast address
 
 #define P(q, r) ((q*256) + r) // Port, q = quotient, r = remainder
 
@@ -48,7 +49,7 @@ void parse_string(char * src,
 				  char * dest[], 
 				  size_t n, 
 				  char * delim) {
-	int i = 1;
+	int i = 0;
 	char * token = strtok(src, delim);
 	do {
 		dest[i++] = token;
@@ -76,6 +77,27 @@ void print_help()
 	printf("\tquery <acctnum>\n");
 	printf("\tupdate <acctnum> <value>\n");
 	printf("\tquit\n\n");
+}
+
+/**
+ * Initializes a database lookup query.
+ * @param query A pointer to a query_t struct to initialize.
+ * @param acctnum The account number to query.
+ */
+void init_query(struct query_t * query, int acctnum) {
+    query->acctnum = htonl(acctnum);
+}
+
+/**
+ * Initializes a database update query.
+ * @param update A pointer to an update_t struct to initialize.
+ * @param acctnum The account number to update.
+ * @param value The value to update the account with.
+ */
+void init_update(struct update_t * update, int acctnum, float value) {
+    update->acctnum = htonl(acctnum);
+    int *ip = (int*)&value;
+    *ip = htonl(*ip); //can be ntohl or htonl
 }
 
 /**
@@ -134,16 +156,55 @@ bail:
 	return rval;
 }
 
+/**
+ * Attempts to connect to peer from socket sk and send a message.
+ * @param local_sk The local socket to send from.
+ * @param peer The peer to send a message to.
+ * @param plen The size of peer.
+ * @param sendbuf The buffer containing the message to send.
+ * @param sendlen The length of sendbuf.
+ * @param recvbuf The buffer to write response back to.
+ * @param recvlen The length of recvbuf.
+ * @returns 0 on success, -1 on error.
+ */
+int connect_and_send(int local_sk, 
+					 struct sockaddr_in * peer, 
+					 socklen_t plen, 
+					 char * sendbuf, 
+					 size_t sendlen, 
+					 char * recvbuf, 
+					 size_t recvlen) {
+	// duplicate the socket
+	int remote_sk = dup(local_sk);
+	
+	// connect on the duplicate
+	if (connect(remote_sk, (struct sockaddr *)peer, plen) < 0) {
+		perror("connect error");
+		return -1;
+	}
+
+	// attempt to send the message
+	send(local_sk, sendbuf, sendlen, 0);
+
+	// attempt to receive
+	recv(local_sk, recvbuf, recvlen, 0);
+
+	// close the duplicate
+	close(remote_sk);
+
+	return 0;
+}
+
 int main(int argc, char * argv[]) 
 {
 	// networking variables
 	struct sockaddr_in local, remote;
-	int local_sk=0, remote_sk=0;
+	int local_sk=0;
 	socklen_t len=sizeof(local), rlen=sizeof(remote);
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	// Broadcast a request to the mapper for the addr string
-	if (get_service_address("CISBANK", DOT1H_BC_ADDR, recvbuf, sizeof(recvbuf)) < 0) {
+	if (get_service_address("CISBANK", BROADCAST_ADDR, recvbuf, sizeof(recvbuf)) < 0) {
 		perror("broadcast error");
 		exit(1);
 	}
@@ -173,14 +234,42 @@ int main(int argc, char * argv[])
 	char * tokens[3]; // longest cmd is three tokens
 	while (1) {
 		printf(">: ");
-		fgets(cmdbuf, BUFMAX, stdin);
+		fgets(cmdbuf, BUFMAX, stdin); // fgets leaves \n at eos
 		cmdbuf[strlen(cmdbuf)-1] = '\0'; // get rid of \n
 		parse_string(cmdbuf, tokens, 3, " ");
 
 		if (strcmp(tokens[0], "query") == 0) {
 			// TODO: Build a query request and send to database
+            struct query_t query;
+            init_query(&query, atoi(tokens[1]));
+			memcpy(sendbuf, &query, sizeof(query));
+			if (connect_and_send(local_sk, 
+								 &remote, 
+								 rlen, 
+								 sendbuf, 
+								 sizeof(sendbuf), 
+								 recvbuf, 
+								 sizeof(recvbuf)) < 0) { // error
+				// TODO: Maybe print error here?
+			} else {
+
+			}
 		} else if (strcmp(tokens[0], "update") == 0) {
 			// TODO: Build an update request and sent to database
+            struct update_t update;
+            init_update(&update, atoi(tokens[1]), strtof(tokens[2], NULL));
+			memcpy(sendbuf, &update, sizeof(update));
+			if (connect_and_send(local_sk, 
+								 &remote, 
+								 rlen, 
+								 sendbuf, 
+								 sizeof(sendbuf), 
+								 recvbuf, 
+								 sizeof(recvbuf)) < 0) { // error
+				// TODO: Maybe print error here?
+			} else {
+
+			}
 		} else if (strcmp(tokens[0], "help") == 0) {
 			print_help();
 		} else if (strcmp(tokens[0], "quit") == 0) {
@@ -190,5 +279,6 @@ int main(int argc, char * argv[])
 		}
 	}
 
+	close(local_sk);
 	return 0;
 }

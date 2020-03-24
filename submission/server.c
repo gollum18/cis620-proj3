@@ -31,9 +31,10 @@
 #define QUERY_CODE 1000
 #define UPDATE_CODE 1001
 
-#define DOT0H_BC_ADDR "192.168.0.255"
-#define DOT1H_BC_ADDR "192.168.1.255"
-#define LLAB_BC_ADDR "137.148.254.255"
+#define DOT0H_BC_ADDR "192.168.0.255" // Try this 1st
+#define DOT1H_BC_ADDR "192.168.1.255" // If the above doesnt work, use this
+#define LLAB_BC_ADDR "137.148.254.255" // This should be what we use for the submission
+#define BROADCAST_ADDR DOT1H_BC_ADDR // change this to one of the above
 
 #define Q(p) (p/256) // Quotient, p = port
 #define R(p) (p%256) // Remainder, p = port
@@ -62,7 +63,7 @@ void parse_string(char * src,
 				  char * dest[],
 				  size_t n,
 				  char * delim) {
-	int i = 1;
+	int i = 0;
 	char * token = strtok(src, delim);
 	do {
 		dest[i++] = token;
@@ -289,7 +290,7 @@ int main(int argc, char * argv[]) {
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	// broadcast the service to the mapper
-	if (broadcast_service("CISBANK", DOT1H_BC_ADDR) < 0) {
+	if (broadcast_service("CISBANK", BROADCAST_ADDR) < 0) {
 		perror("broadcast error");
 		exit(1);
 	}

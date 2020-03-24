@@ -31,7 +31,7 @@ void parse_string(char * src,
 				  char * dest[],
 				  size_t n,
 				  char * delim) {
-	int i = 1;
+	int i = 0;
 	char * token = strtok(src, delim);
 	do {
 		dest[i++] = token;
