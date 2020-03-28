@@ -118,8 +118,8 @@ int query_record(struct query_t query, struct record_t * record) {
 
 	ssize_t bytes_read = 0;
 	do {
-		bytes_read = read(fd, &record, sizeof(struct record_t));
-	} while (bytes_read != 0 && record->acctnum != acctnum);
+		bytes_read = read(fd, record, sizeof(struct record_t));
+	} while (bytes_read > 0 && record->acctnum != acctnum);
 	
 	close(fd);
 
@@ -150,7 +150,7 @@ int update_record(struct update_t update) {
 	ssize_t bytes_read = 0;
 	do {
 		bytes_read = read(fd, &record, sizeof(struct record_t));
-	} while (bytes_read != 0 && record.acctnum != acctnum);
+	} while (bytes_read > 0 && record.acctnum != acctnum);
 
 	// make sure the record was found
 	if (record.acctnum != acctnum) {
@@ -448,8 +448,11 @@ int main(int argc, char * argv[]) {
 				if (pkt.body.query.code == DB_QUERY_CODE) {
 					pkt.body.query.acctnum = ntohl(pkt.body.query.acctnum);
 					if (query_record(pkt.body.query, &pkt.body.record) == 0) {
-						printf("QUERY: Record found!\n");
 						pkt.ptype = htons(PTYPE_RECORD);
+						pkt.body.record.acctnum = htonl(pkt.body.record.acctnum);
+						pkt.body.record.age = htonl(pkt.body.record.age);
+						int * ip = (int *)&pkt.body.record.value;
+						*ip = htonl(*ip);
 					} else { // error
 						pkt.ptype = PTYPE_ERROR;
 						strcpy(pkt.body.message, "Record not found!");
@@ -493,8 +496,6 @@ int main(int argc, char * argv[]) {
 				close(new_sk);
 				exit(1);
 			}
-
-			printf("Sent packet of type: %d\n", ntohs(pkt.ptype));
 
 			close(new_sk);
 			exit(0);

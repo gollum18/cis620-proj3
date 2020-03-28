@@ -83,25 +83,11 @@ void decode_addrstr(char * addrstr, char * ip, unsigned short * port);
 int main(int, char * []);
 void parse_string(char *, char * [], int, char *);
 void print_help();
-void print_record(struct record_t);
 int request_service(char *, struct sockaddr_in *);
 
 //
 // METHODS
 //
-
-/**
- * Pretty-prints a record to stdout.
- * @param record The record to print.
- */
-void print_record(struct record_t record) {
-	printf("-- BEGIN RECORD --\n");
-	printf("\tAcct. Num: %d\n", record.acctnum);
-	printf("\tName: %s\n", record.name);
-	printf("\tValue: %f\n", record.value);
-	printf("\tAge: %d\n", record.age);
-	printf("-- END RECORD --\n\n");
-}
 
 /**
  * Prints command line help.
@@ -360,7 +346,7 @@ int main(int argc, char * argv[]) {
 				int * ip = (int *)&pkt.body.record.value;
 				*ip = ntohl(*ip);
 
-				print_record(pkt.body.record);
+				printf("%s %d %f\n", pkt.body.record.name, pkt.body.record.acctnum, pkt.body.record.value);
 			} else if (pkt.ptype == PTYPE_UPDATE) {
 				if (strcmp(pkt.body.message, "OK") == 0) {
 					// TODO: Notify the update succeeded
