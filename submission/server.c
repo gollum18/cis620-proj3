@@ -1,3 +1,21 @@
+/**
+ * Implements a database service that allows clients to query for
+ * and update records.
+ * Changelog:
+ *	03/13/2020 - Created initial version.
+ *	03/15/2020 - Started net code.
+ *	03/18/2020 - Continued net code.
+ *	03/20/2020 - Add in signal handler for child process.
+ *			   - Change size_t to socklen_t.
+ *			   - Implement service broadcasting.
+ *  03/24/2020 - Implement changes to broadcasting.
+ *			   - Add in addr_info_t type to fix recv at client
+ *	03/27/2020 - Add in packet wrapper for INET messages.
+ *			   - No longer use addr_info_t type.
+ *	03/28/2020 - Get server working 100%.
+ *	03/30/2020 - Complete testing of server.c
+ */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>

@@ -1,3 +1,21 @@
+/**
+ * Implements a client that interacts with the database service.
+ * Changelog:
+ *	03/13/2020 - Created initial version.
+ *	03/15/2020 - Started net code.
+ *	03/18/2020 - Continued net code.
+ *	03/20/2020 - Change size_t to socklen_t.
+ *	03/21/2020 - Refactor get_service_address.
+ *  03/24/2020 - Implement changes to broadcasting.
+ *				 Introduce addr_info_t type to fix recv issue.
+ *	03/27/2020 - Add in packet wrapper for INET messages.
+ *	03/28/2020 - Get client 100% working.
+ *	03/30/2020 - Complete testing of client.
+ * Bugs:
+ *	03/25/2020 - --Client connects successfully to server by
+ *				 immediately closes when calling query-- FIXED
+ */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>

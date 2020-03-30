@@ -1,3 +1,19 @@
+/**
+ * Implements a net app that maps Internet services to an IP
+ * address and port for a LAN.
+ * Changelog:
+ *	03/13/2020 - Created initial version.
+ *	03/15/2020 - Refactored some of the cache methods.
+ *	03/20/2020 - Started net code.
+ *	03/20/2020 - Change size_t to socklen_t.
+ *  03/24/2020 - Implement changes to broadcasting.
+ *			   - Add in addr_info_str to fix recv issue at client
+ *	03/27/2020 - Add in packet wrapper for INET messages.
+ *			   - No longer use addr_info_str type.
+ *	03/28/2020 - Get servicemap working 100%.
+ *	03/30/2020 - Complete testing of servicemap.c
+ */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
