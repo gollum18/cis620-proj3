@@ -1,163 +1,208 @@
-/**
- * Implements a net app that maps Internet services to an IP
- * address and port for a LAN.
- * Changelog:
- *	03/13/2020 - Created initial version.
- *	03/15/2020 - Refactored some of the cache methods.
- *	03/20/2020 - Started net code.
- *	03/20/2020 - Change size_t to socklen_t.
- *  03/24/2020 - Implement changes to broadcasting.
- *			   - Add in addr_info_str to fix recv issue at client
- */
-
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/ip.h>
 #include <arpa/inet.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <netinet/ip.h>
 #include <unistd.h>
 #include <sys/fcntl.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 
+// service map defines
 #define BUFMAX 1024
+#define NENTRIES 32
+#define NOT_FOUND NENTRIES + 1
+#define PORT 21896
 
-#define CLIENT_PORT 7776
-#define SERVER_PORT 7777 
-#define MAPPER_PORT 21896
+// packet code defines
+#define PTYPE_REGISTER 0
+#define PTYPE_LOOKUP 10
+#define PTYPE_QUERY 20
+#define PTYPE_UPDATE 30
+#define PTYPE_RECORD 40
+#define PTYPE_ERROR 50
 
-#define MAX_ENTRIES 32
-#define NOT_FOUND MAX_ENTRIES+1
+//
+// packet stuff
+//
 
-struct addr_info_t {
-	char addr_info[24];
+// database query type
+struct query_t {
+	int code;
+	int acctnum;
 };
 
-//###,###,###,###,###,###
-struct cache_entry_t {
-	char service[24];
-	struct addr_info_t s_addr_info;
+// database update type
+struct update_t {
+	int code;
+	int acctnum;
+	float value;
+};
+
+// database record type
+struct record_t {
+	int acctnum;
+	char name[20];
+	float value;
+	int age;
+};
+
+// allows for sending/receiving fixed sized chunks to/from clients
+// all of these refer to the same region in memory
+union body_t {
+	char message[BUFMAX/4]; // can be commands, errors, etc...
+	struct query_t query;
+	struct update_t update;
+	struct record_t record;
+};
+
+// send this type to/from clients - best to define in header file
+struct pkt_t {
+	unsigned short ptype; // what data type is stored in the packet
+	union body_t body; // the data stored in the packet
+};
+
+//
+// service cache stuff
+//
+
+struct entry_t {
+	char service[20];
+	char addrstr[24];
 	unsigned short occupied;
 	unsigned long age;
 };
 
-void parse_string(char * src,
-				  char * dest[],
-				  size_t n,
-				  char * delim) {
-	int i = 0;
-	char * token = strtok(src, delim);
-	do {
-		dest[i++] = token;
-	} while (i < n && (token = strtok(NULL, delim)) != NULL);
-}
+// locally caches services and their addresses for use by 
+//	clients of those services
+static struct entry_t scache[NENTRIES];
 
-// The service cache
-static struct cache_entry_t addr_cache[MAX_ENTRIES];
+//
+// PROTOTYPES
+//
+
+void age_cache();
+char * get_cache(char *);
+unsigned int page_cache();
+void parse_string(char *, char * [], int, char *);
+void put_cache(char *, char *);
+
+//
+// METHODS
+//
 
 /**
- * Ages all of the entries in the service cache by one unit.
+ * Ages the entries in the service cache by one unit.
  */
-void age_entries() {
-	for (size_t i = 0; i < MAX_ENTRIES; i++) {
-		if (addr_cache[i].occupied) {
-			addr_cache[i].age++;
+void age_cache() {
+	for (unsigned int i = 0; i < NENTRIES; i++) {
+		if (scache[i].occupied) {
+			scache[i].age++;
 		}
 	}
 }
 
 /**
- * Retrieves an entry from the service cache.
- * @param service A string containing the service to lookup.
- * @returns A pointer to the service address string on success, NULL on error.
+ * Attempts to retrieve an entry from the service cache.
+ * @param service A pointer to a buffer containing the service
+ * to lookup.
+ * @return The service address on success, NULL on error.
  */
-struct addr_info_t * get_entry(char * service) {
-	for (size_t i = 0; i < MAX_ENTRIES; i++) {
-		if (addr_cache[i].occupied && strcmp(service, addr_cache[i].service) == 0) {
-			return &(addr_cache[i].s_addr_info);
+char * get_cache(char * service) {
+	unsigned int pos = NOT_FOUND;
+	
+	for (unsigned int i = 0; i < NENTRIES; i++) {
+		if (scache[i].occupied) {
+			if (strcmp(scache[i].service, service) == 0) {
+				pos = i;
+				break;
+			}
 		}
 	}
 
-	return NULL;
-}
-
-/**
- * Initializes the service cache.
- */
-void init_cache() {
-	for (size_t i = 0; i < MAX_ENTRIES; i++) {
-		memset(addr_cache[i].service, 0, sizeof(addr_cache[i].service));
-		memset(addr_cache[i].s_addr_info.addr_info, 0, sizeof(addr_cache[i].s_addr_info.addr_info));
-		addr_cache[i].age = 0;
-		addr_cache[i].occupied = 0;
+	if (pos == NOT_FOUND) {
+		return NULL;
+	} else {
+		scache[pos].age = 0;
+		return scache[pos].addrstr;	
 	}
 }
 
 /**
- * Pages an entry from the service cache. Called when the cache is full and a 
- * put request is made.
- * @returns A position in the cache to store the new entry.
+ * Pages an entry from the service cache.
  */
-size_t page_entry() {
-	size_t pos = 0;
-	unsigned long age = addr_cache[0].age;
+unsigned int page_cache() {
+	unsigned int pos = 0, age = 0;
 
-	for (size_t i = 1; i < MAX_ENTRIES; i++) {
-		if (addr_cache[i].occupied && addr_cache[i].age > age) {
-			age = addr_cache[i].age;
+	for (unsigned int i = 0; i < NENTRIES; i++) {
+		if (scache[i].age > age) {
 			pos = i;
+			age = scache[i].age;
 		}
 	}
 
-	memset(addr_cache[pos].service, 0, sizeof(addr_cache[pos].service));
-	memset(addr_cache[pos].s_addr_info.addr_info, 0, sizeof(addr_cache[pos].s_addr_info.addr_info));
-	addr_cache[pos].occupied = 0;
-	addr_cache[pos].age = 0;
+	scache[pos].occupied = 0;
+	scache[pos].age = 0;
 
 	return pos;
 }
 
-void print_cache() {
-	for (size_t i = 0; i < MAX_ENTRIES; i++) {
-		if (addr_cache[i].occupied) {
-			printf("Entry %zd: %s => %s\n", i, addr_cache[i].service, addr_cache[i].s_addr_info.addr_info);
-		}
-	}
+/**
+ * Parses a string and stores it in the destination buffer. This
+ * function internally mutates the src string. If you need it 
+ * after calling this function, pass a copy of it to this function.
+ * @param src A pointer to a buffer containing the src string.
+ * @param dest A pointer to a buffer array to write tokens back to.
+ * @param n The number of tokens to store in dest.
+ * @param delim The tokenization delimiter.
+ */
+void parse_string(char * src, char * dest[], int n, char * delim) {
+	int tokens = 0;
+	char * token = strtok(src, delim);
+	do {
+		dest[tokens++] = token;
+	} while (tokens < n && (token = strtok(NULL, delim)) != NULL);
 }
 
 /**
- * Stores an entry in the service cache.
- * @param service The name of the service.
- * @param addr_info The address string that points to the service host.
+ * Stores a service/addrstr pair in the service cache.
+ * @param service The LAN unique name of the service.
+ * @param addrstr The LAN unique address string of the server 
+ * providing the service.
  */
-void put_entry(char * service, char * addr_info) {
-	size_t pos = NOT_FOUND;
+void put_cache(char * service, char * addrstr) {
+	unsigned int pos = NOT_FOUND;
 
-	for (size_t i = 0; i < MAX_ENTRIES; i++) {
-		if (!addr_cache[i].occupied) {
+	age_cache();
+
+	for (unsigned int i = 0; i < NENTRIES; i++) {
+		if (!scache[i].occupied) {
 			pos = i;
 			break;
 		}
 	}
 
 	if (pos == NOT_FOUND) {
-		pos = page_entry();
+		pos = page_cache();
 	}
 
-	strncpy(addr_cache[pos].service, service, sizeof(addr_cache[pos].service));
-	strncpy(addr_cache[pos].s_addr_info.addr_info, addr_info, sizeof(addr_cache[pos].s_addr_info.addr_info));
-	addr_cache[pos].age = 0;
-	addr_cache[pos].occupied = 1;
+	memset(scache[pos].service, 0, sizeof(scache[pos].service));
+	memset(scache[pos].addrstr, 0, sizeof(scache[pos].addrstr));
+	strncpy(scache[pos].service, service, sizeof(scache[pos].service));
+	strncpy(scache[pos].addrstr, addrstr, sizeof(scache[pos].addrstr));
+	scache[pos].occupied = 1;
+	scache[pos].age = 0;
 }
 
 /**
- * Starts the service mapper.
+ * Entry point of the service map.
+ * @param argc Number of args passed via the command line.
+ * @param argv Args passed from the command line.
  */
 int main(int argc, char * argv[]) {
-	struct addr_info_t s_addr_info;
 	struct sockaddr_in local, remote;
 	socklen_t len=sizeof(local), rlen=sizeof(remote);
-	int sk=0, rval=0;
+	int sk;
 	char sendbuf[BUFMAX], recvbuf[BUFMAX];
 
 	if ((sk = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -166,50 +211,85 @@ int main(int argc, char * argv[]) {
 	}
 
 	local.sin_family = AF_INET;
-	local.sin_port = htons(MAPPER_PORT);
+	local.sin_port = htons(PORT);
 	local.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(sk, (struct sockaddr *)&local, len) < 0) {
 		perror("bind error");
-		rval = 1;
-		goto bail;
+		close(sk);
+		return 1;
 	}
 
 	while (1) {
-		memset(sendbuf, 0, BUFMAX);
-		memset(recvbuf, 0, BUFMAX);
+		// these get written to/read from sendbuf/recvbuf
+		struct pkt_t pkt;
+		
+		memset(pkt.body.message, 0, sizeof(pkt.body.message));
+		memset(sendbuf, 0, sizeof(sendbuf));
+		memset(recvbuf, 0, sizeof(recvbuf));
 
-		// receive over the UDP socket, dest host is remote
-		recvfrom(sk, recvbuf, BUFMAX, 0, (struct sockaddr *)&remote, (socklen_t *)&rlen);
-
-		char * tokens[3]; // max token amt is 3
-		parse_string(recvbuf, tokens, 3, " ");
-
-		if (strcmp(tokens[0], "PUT") == 0) { // PUT command
-			// locally store the address
-			printf("Received from %s: PUT %s %s\n", inet_ntoa(remote.sin_addr), tokens[1], tokens[2]);
-			put_entry(tokens[1], tokens[2]);
-			strcpy(s_addr_info.addr_info, "OK");
-		} else if (strcmp(tokens[0], "GET") == 0) { // GET command
-			printf("Received from %s: GET %s\n", inet_ntoa(remote.sin_addr), tokens[1]);
-			// retrieve the entry
-			struct addr_info_t * addr_ptr = get_entry(tokens[1]);
-			if (addr_ptr == NULL) { // error
-				strcpy(s_addr_info.addr_info, "FAIL");
-			} else {
-				s_addr_info = *(addr_ptr);
-			}
-		} else { // error
-			strcpy(s_addr_info.addr_info, "FAIL");
+		ssize_t net_bytes = 0;
+		if ((net_bytes = recvfrom(sk, recvbuf, sizeof(struct pkt_t), 0, (struct sockaddr *)&remote, &rlen)) < 0) {
+			perror("recvfrom error");
+			continue;
 		}
 
-		memcpy(sendbuf, &s_addr_info, sizeof(struct addr_info_t));
+		if (net_bytes != sizeof(struct pkt_t)) {
+			perror("recvfrom error");
+			continue;
+		}
 
-		// send the message to the dest host
-		sendto(sk, sendbuf, sizeof(struct addr_info_t), 0, (struct sockaddr *)&remote, rlen);
+		memcpy(&pkt, recvbuf, sizeof(struct pkt_t));
+		pkt.ptype = ntohs(pkt.ptype);
+		printf("Received from %s: %s\n", inet_ntoa(remote.sin_addr), pkt.body.message);
+
+		if (pkt.ptype == PTYPE_REGISTER) {
+			char * tokens[3];
+			parse_string(pkt.body.message, tokens, 3, " ");
+
+			if (strcmp(tokens[0], "PUT") == 0) {
+				put_cache(tokens[1], tokens[2]);
+
+				pkt.ptype = htons(PTYPE_REGISTER);
+				memset(pkt.body.message, 0, sizeof(pkt.body.message));
+				strcpy(pkt.body.message, "OK");
+			} else {
+				pkt.ptype = PTYPE_ERROR;
+			}
+		} else if (pkt.ptype == PTYPE_LOOKUP) {
+			char * tokens[2];
+			parse_string(pkt.body.message, tokens, 2, " ");
+
+			if (strcmp(tokens[0], "GET") == 0) {
+				char * addrstr;
+				if ((addrstr = get_cache(tokens[1])) != NULL) {
+					pkt.ptype = htons(PTYPE_LOOKUP);
+					memset(pkt.body.message, 0, sizeof(pkt.body.message));
+					strcpy(pkt.body.message, addrstr);
+				} else {
+					pkt.ptype = PTYPE_ERROR;
+				}
+			} else {
+				pkt.ptype = PTYPE_ERROR;
+			}
+		} else {
+			pkt.ptype = PTYPE_ERROR;
+		}
+
+		// check if there was an error - overwrite code
+		if (pkt.ptype == PTYPE_ERROR) {
+			pkt.ptype = htons(pkt.ptype);
+			strcpy(pkt.body.message, "FAIL");
+		}
+
+		// write back the response packet		
+		memcpy(sendbuf, &pkt, sizeof(struct pkt_t));
+
+		if (sendto(sk, sendbuf, sizeof(struct pkt_t), 0, (struct sockaddr *)&remote, rlen) < 0) {
+			perror("sendto error");
+			continue;
+		}
 	}
 
-bail:
-	close(sk);
-	return rval;
+	return 0;
 }
