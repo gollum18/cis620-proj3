@@ -469,7 +469,6 @@ int main(int argc, char * argv[]) {
 					*ip = ntohl(*ip);
 
 					if (update_record(pkt.body.update) == 0) {
-						printf("UPDATE: Record found!\n");
 						pkt.ptype = htons(PTYPE_UPDATE);
 						memset(pkt.body.message, 0, sizeof(pkt.body.message));
 						strcpy(pkt.body.message, "OK");
