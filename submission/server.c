@@ -42,7 +42,7 @@
 #define LLAB_BC_ADDR "137.148.205.255" // use when submitting
 
 // the broadcast address (set to one of the above)
-#define BROADCAST_ADDR DOT1_BC_ADDR
+#define BROADCAST_ADDR LLAB_BC_ADDR
 
 // packet code defines
 #define PTYPE_REGISTER 0 // packet contains service register msg
