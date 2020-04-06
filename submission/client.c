@@ -11,6 +11,7 @@
  *	03/27/2020 - Add in packet wrapper for INET messages.
  *	03/28/2020 - Get client 100% working.
  *	03/30/2020 - Complete testing of client.
+ *	04/05/2020 - Create method to send packets, cleaner this way.
  * Bugs:
  *	03/25/2020 - --Client connects successfully to server by
  *				 immediately closes when calling query-- FIXED
@@ -28,7 +29,7 @@
 
 // client defines
 #define BUFMAX 1024
-#define CLIENT_PORT 7776
+#define CLIENT_PORT 7777
 #define MAPPER_PORT 21896
 
 // various broadcast addresses
@@ -260,6 +261,78 @@ int request_service(char * service, struct sockaddr_in * dest) {
 	return 0;
 }
 
+int send_pkt(
+		struct pkt_t pkt, 
+		struct sockaddr_in remote, socklen_t rlen) {
+	struct sockaddr_in local;
+	socklen_t len=sizeof(local);
+	int sk;
+	char sendbuf[BUFMAX], recvbuf[BUFMAX];
+
+	if ((sk = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("socket error");
+		return -1;
+	}
+
+	local.sin_family = AF_INET;
+	local.sin_port = htons(CLIENT_PORT);
+	local.sin_addr.s_addr = INADDR_ANY;
+
+	if (bind(sk, (struct sockaddr *)&local, len) < 0) {
+		perror("bind error");
+		close(sk);
+		return -1;
+	}
+
+	if (connect(sk, (struct sockaddr *)&remote, rlen) < 0) {
+		perror("connect error");
+		close(sk);
+		return -1;
+	}
+
+	memset(sendbuf, 0, sizeof(sendbuf));
+	memcpy(sendbuf, &pkt, sizeof(struct pkt_t));
+
+	ssize_t net_bytes = 0;
+	if ((net_bytes = send(sk, sendbuf, sizeof(struct pkt_t), 0)) != sizeof(struct pkt_t)) {
+		perror("send error");
+		close(sk);
+		return -1;
+	}
+
+	if ((net_bytes = recv(sk, recvbuf, sizeof(struct pkt_t), 0)) != sizeof(struct pkt_t)) {
+		perror("recv error");
+		close(sk);
+		return -1;
+	}
+
+	memcpy(&pkt, recvbuf, sizeof(struct pkt_t));
+
+	pkt.ptype = ntohs(pkt.ptype);
+	if (pkt.ptype == PTYPE_RECORD) {
+		// convert the fields to local byte order
+		pkt.body.record.acctnum = ntohl(pkt.body.record.acctnum);
+		pkt.body.record.age = ntohl(pkt.body.record.age);
+		int * ip = (int *)&pkt.body.record.value;
+		*ip = ntohl(*ip);
+
+		printf("%s %d %.1f\n", pkt.body.record.name, pkt.body.record.acctnum, pkt.body.record.value);
+	} else if (pkt.ptype == PTYPE_UPDATE) {
+		if (strcmp(pkt.body.message, "OK") == 0) {
+			// do nothing here, its handled in main
+		} else {
+			printf("Packet Error: %s\n\n", pkt.body.message);
+		}
+	} else if (pkt.ptype == PTYPE_ERROR) {
+		printf("Packet Error: %s\n\n", pkt.body.message);
+	} else {
+		printf("An unexpected error occurred!\n\n");
+	}
+
+	close(sk);
+	return 0;
+}
+
 /**
  * Entry point of the client program.
  * @param argc Number of arguments passed via command line.
@@ -267,8 +340,7 @@ int request_service(char * service, struct sockaddr_in * dest) {
  */
 int main(int argc, char * argv[]) {
 	struct sockaddr_in remote;
-	socklen_t rlen=sizeof(remote);
-	char sendbuf[BUFMAX], recvbuf[BUFMAX];
+	socklen_t rlen = sizeof(remote);
 
 	// attempt to initialize the remote socket
 	if (request_service("CISBANK", &remote) < 0) {
@@ -282,6 +354,7 @@ int main(int argc, char * argv[]) {
 	while (1) {
 		printf(">: ");
 		fgets(inbuf, BUFMAX, stdin);
+
 		if (strlen(inbuf) == 0) {
 			continue;
 		}
@@ -316,68 +389,16 @@ int main(int argc, char * argv[]) {
 		}
 
 		if (sendmsg) {
-			struct sockaddr_in local;
-			socklen_t len=sizeof(local);
-			int sk;
+			send_pkt(pkt, remote, rlen);
 
-			if ((sk = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-				perror("socket error");
-				continue;
+			if (strcmp(tokens[0], "update") == 0) {
+				// send a query message to confirm update
+				pkt.ptype = htons(PTYPE_QUERY);
+				pkt.body.query.code = htonl(DB_QUERY_CODE);
+				pkt.body.query.acctnum = htonl(atoi(tokens[1]));
+				send_pkt(pkt, remote, rlen);
 			}
 
-			local.sin_family = AF_INET;
-			local.sin_port = htons(CLIENT_PORT);
-			local.sin_addr.s_addr = INADDR_ANY;
-
-			if (bind(sk, (struct sockaddr *)&local, len) < 0) {
-				perror("bind error");
-				close(sk);
-				continue;
-			}
-
-			if (connect(sk, (struct sockaddr *)&remote, rlen) < 0) {
-				perror("connect error");
-				continue;
-			}
-
-			memset(sendbuf, 0, sizeof(sendbuf));
-			memcpy(sendbuf, &pkt, sizeof(struct pkt_t));
-
-			ssize_t net_bytes = 0;
-			if ((net_bytes = send(sk, sendbuf, sizeof(struct pkt_t), 0)) != sizeof(struct pkt_t)) {
-				perror("send error");
-				continue;
-			}
-
-			if ((net_bytes = recv(sk, recvbuf, sizeof(struct pkt_t), 0)) != sizeof(struct pkt_t)) {
-				perror("recv error");
-				continue;
-			}
-
-			memcpy(&pkt, recvbuf, sizeof(struct pkt_t));
-
-			pkt.ptype = ntohs(pkt.ptype);
-			if (pkt.ptype == PTYPE_RECORD) {
-				// convert the fields to local byte order
-				pkt.body.record.acctnum = ntohl(pkt.body.record.acctnum);
-				pkt.body.record.age = ntohl(pkt.body.record.age);
-				int * ip = (int *)&pkt.body.record.value;
-				*ip = ntohl(*ip);
-
-				printf("%s %d %f\n", pkt.body.record.name, pkt.body.record.acctnum, pkt.body.record.value);
-			} else if (pkt.ptype == PTYPE_UPDATE) {
-				if (strcmp(pkt.body.message, "OK") == 0) {
-					// TODO: Notify the update succeeded
-				} else {
-					printf("Packet Error: %s\n\n", pkt.body.message);
-				}
-			} else if (pkt.ptype == PTYPE_ERROR) {
-				printf("Packet Error: %s\n\n", pkt.body.message);
-			} else {
-				printf("An unexpected error occurred!\n\n");
-			}
-
-			close(sk);
 			sendmsg = 0;
 		}
 	}
