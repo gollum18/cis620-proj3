@@ -17,3 +17,6 @@ servicemap: servicemap.o
 
 clean:
 	rm $(EXEFILES) $(OBJFILES)
+	
+submit: 
+	turnin -c cis620s -p proj3 report.pdf client.c server.c servicemap.c makefile
