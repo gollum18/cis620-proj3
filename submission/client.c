@@ -392,6 +392,9 @@ int main(int argc, char * argv[]) {
 			send_pkt(pkt, remote, rlen);
 
 			if (strcmp(tokens[0], "update") == 0) {
+				// need to wait for TCP to make port available
+				usleep(500);
+				
 				// send a query message to confirm update
 				pkt.ptype = htons(PTYPE_QUERY);
 				pkt.body.query.code = htonl(DB_QUERY_CODE);
